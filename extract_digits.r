@@ -73,7 +73,7 @@ extract_leading_digits <- function(numbers, mode = 1) {
   # Function to get the first digit
   get_first_digit <- function(s) {
     # Remove leading zeros after the decimal point for numbers < 1 (e.g., "0.00123" -> "1")
-    s <- gsub("^0+\\.", "", s) # Remove "0." or "0.00" part
+    s <- gsub("^0+\\.0*", "", s) # Remove "0." or "0.00" part
     
     # Remove non-digit characters (like '.') and then take the first character
     s <- gsub("\\D", "", s) # Remove non-digits
@@ -86,7 +86,7 @@ extract_leading_digits <- function(numbers, mode = 1) {
   # Function to get the second digit
   get_second_digit <- function(s) {
     # Remove leading zeros after the decimal point for numbers < 1 (e.g., "0.00123" -> "123")
-    s <- gsub("^0+\\.", "", s) # Remove "0." or "0.00" part
+    s <- gsub("^0+\\.0*", "", s) # Remove "0." or "0.00" part
     
     # Remove non-digit characters (like '.')
     s <- gsub("\\D", "", s) # Remove non-digits

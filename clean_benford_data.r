@@ -62,9 +62,9 @@ clean_benford_data <- function(file_path) {
   # Identify and remove values that are "0"
   values_char <- values_char[values_char != "0"]
   
-  # Identify and remove numbers that start with zero (e.g., "0123", "0.5")
+  # Identify and remove numbers that start with zero (e.g., "0123", "05")
   # This regex matches strings that start with '0' followed by any digit or a dot.
-  values_char <- values_char[!grepl("^0[0-9.]", values_char)]
+  values_char <- values_char[!grepl("^0[0-9]", values_char)]
   
   # 3. If the cell is string value (e.g. "123") convert it as number
   # Attempt to convert to numeric. Non-numeric values will become NA.
