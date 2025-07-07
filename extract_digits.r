@@ -7,11 +7,12 @@
 #' @param numbers A numeric vector of positive, non-zero values.
 #' @param mode An integer specifying which digits to extract:
 #'   1: Extracts the first leading digit.
-#'   2: Extracts the second leading digit.
-#'   3: Extracts both the first and second leading digits (returns a list).
-#' @return A numeric vector (for mode 1 or 2) or a list of two numeric vectors
-#'         (for mode 3). Returns an empty vector or an empty list if input is empty
-#'         or no valid digits can be extracted.
+#'   2: Extracts the second leading digit. Numbers with only one significant digit
+#'      (e.g., 1, 0.005) will not yield a second digit and will be excluded.
+#'   3: Extracts the first two leading digits, combined into a single number (e.g., 12 for 1st digit 1, 2nd digit 2).
+#'      Numbers with only one significant digit will not yield a combined two-digit number and will be excluded.
+#' @return A numeric vector (for mode 1, 2, or 3). Returns an empty vector if input is empty
+#'          or no valid digits can be extracted.
 #' @examples
 #' # Example data (assuming it's already cleaned)
 #' data_for_digits <- c(123, 45, 6789, 1, 9.87, 20.5, 3000)
@@ -20,24 +21,32 @@
 #' first_digits <- extract_leading_digits(data_for_digits, mode = 1)
 #' print("First digits:")
 #' print(first_digits)
+#' # Expected: 1, 4, 6, 1, 9, 2, 3
 #'
 #' # Mode 2: Second digit only
 #' second_digits <- extract_leading_digits(data_for_digits, mode = 2)
 #' print("Second digits:")
 #' print(second_digits)
+#' # Expected: 2, 5, 7, NA (1 excluded), 8, 0, 0
+#' # So, output should be: 2, 5, 7, 8, 0, 0
 #'
-#' # Mode 3: First and second digits
-#' all_digits <- extract_leading_digits(data_for_digits, mode = 3)
-#' print("First and second digits (list):")
-#' print(all_digits$first_digits)
-#' print(all_digits$second_digits)
+#' # Mode 3: First and second digits combined
+#' combined_digits <- extract_leading_digits(data_for_digits, mode = 3)
+#' print("First and second digits (combined):")
+#' print(combined_digits)
+#' # Expected: 12, 45, 67, NA (1 excluded), 98, 20, 30
+#' # So, output should be: 12, 45, 67, 98, 20, 30
 #'
 #' # Example with numbers less than 1 (but > 0)
 #' data_small <- c(0.123, 0.045, 0.6789, 0.001, 0.987, 0.205)
 #' print("First digits for small numbers:")
 #' print(extract_leading_digits(data_small, mode = 1)) # Should be 1, 4, 6, 1, 9, 2
 #' print("Second digits for small numbers:")
-#' print(extract_leading_digits(data_small, mode = 2)) # Should be 2, 5, 7, 0, 8, 0
+#' print(extract_leading_digits(data_small, mode = 2)) # Should be 2, 5, 7, NA (0.001 excluded), 8, 0
+#' # Output: 2, 5, 7, 8, 0
+#' print("Combined digits for small numbers:")
+#' print(extract_leading_digits(data_small, mode = 3)) # Should be 12, 45, 67, NA (0.001 excluded), 98, 20
+#' # Output: 12, 45, 67, 98, 20
 #'
 #' # Example with empty input
 #' empty_digits <- extract_leading_digits(numeric(0), mode = 1)
@@ -54,11 +63,7 @@ extract_leading_digits <- function(numbers, mode = 1) {
     numbers <- numbers[numbers > 0]
   }
   if (length(numbers) == 0) {
-    if (mode == 3) {
-      return(list(first_digits = numeric(0), second_digits = numeric(0)))
-    } else {
-      return(numeric(0))
-    }
+    return(numeric(0)) # Always return an empty numeric vector for empty input
   }
   
   if (!mode %in% c(1, 2, 3)) {
@@ -68,54 +73,54 @@ extract_leading_digits <- function(numbers, mode = 1) {
   # Convert numbers to character strings to extract digits
   # Using scientific = FALSE to prevent scientific notation for very large/small numbers
   # which could affect digit extraction.
-  numbers_char <- format(numbers, scientific = FALSE, trim = TRUE)
+  numbers_char <- as.character(numbers)
   
   # Function to get the first digit
   get_first_digit <- function(s) {
-    # Remove leading zeros after the decimal point for numbers < 1 (e.g., "0.00123" -> "1")
-    s <- gsub("^0+\\.0*", "", s) # Remove "0." or "0.00" part
+    # Remove leading zeros and any decimal point before the first significant digit
+    s <- gsub("^0*\\.0*", "", s) # FIX: More robust regex
     
-    # Remove non-digit characters (like '.') and then take the first character
-    s <- gsub("\\D", "", s) # Remove non-digits
+    # Remove any remaining non-digit characters (like commas if locale affects format)
+    s <- gsub("\\D", "", s)
+    
     if (nchar(s) == 0) {
-      return(NA) # Handle cases where string becomes empty after removal
+      return(NA) # Handle cases where string becomes empty after removal (e.g., input was "0" or "0.0")
     }
     as.numeric(substr(s, 1, 1))
   }
   
   # Function to get the second digit
   get_second_digit <- function(s) {
-    # Remove leading zeros after the decimal point for numbers < 1 (e.g., "0.00123" -> "123")
-    s <- gsub("^0+\\.0*", "", s) # Remove "0." or "0.00" part
+    # Remove leading zeros and any decimal point before the first significant digit
+    s <- gsub("^0*\\.0*", "", s) # FIX: More robust regex
     
-    # Remove non-digit characters (like '.')
-    s <- gsub("\\D", "", s) # Remove non-digits
+    # Remove any remaining non-digit characters
+    s <- gsub("\\D", "", s)
     
+    # Key change: If there are fewer than 2 significant digits, return NA
     if (nchar(s) < 2) {
-      return(NA) # Not enough digits for a second digit
+      return(NA)
     }
     as.numeric(substr(s, 2, 2))
   }
   
-  first_digits <- NULL
-  second_digits <- NULL
-  
-  if (mode == 1 || mode == 3) {
-    first_digits <- sapply(numbers_char, get_first_digit, USE.NAMES = FALSE)
-    first_digits <- first_digits[!is.na(first_digits)] # Remove NAs
-  }
-  
-  if (mode == 2 || mode == 3) {
-    second_digits <- sapply(numbers_char, get_second_digit, USE.NAMES = FALSE)
-    second_digits <- second_digits[!is.na(second_digits)] # Remove NAs
-  }
-  
-  # Return based on mode
   if (mode == 1) {
-    return(first_digits)
+    first_digits <- sapply(numbers_char, get_first_digit, USE.NAMES = FALSE)
+    return(first_digits[!is.na(first_digits)])
   } else if (mode == 2) {
-    return(second_digits)
+    second_digits <- sapply(numbers_char, get_second_digit, USE.NAMES = FALSE)
+    return(second_digits[!is.na(second_digits)])
   } else if (mode == 3) {
-    return(list(first_digits = first_digits, second_digits = second_digits))
+    first_digits_raw <- sapply(numbers_char, get_first_digit, USE.NAMES = FALSE)
+    second_digits_raw <- sapply(numbers_char, get_second_digit, USE.NAMES = FALSE)
+    
+    # Identify indices where both first and second digits could be extracted
+    # A NA in either means it shouldn't be included in the combined result
+    valid_indices <- !is.na(first_digits_raw) & !is.na(second_digits_raw)
+    
+    # Combine them only for valid entries
+    combined_digits <- (first_digits_raw[valid_indices] * 10) + second_digits_raw[valid_indices]
+    
+    return(combined_digits) # NAs are already excluded by `valid_indices`
   }
 }

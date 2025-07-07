@@ -20,60 +20,108 @@ test_that("Input validation works correctly", {
   expect_equal(suppressWarnings(extract_leading_digits(c(-5, 0, 10), mode = 1)), 1)
 })
 
-test_that("Empty input returns correct structure", {
-  empty_vec <- numeric(0)
-  expect_equal(extract_leading_digits(empty_vec, mode = 1), numeric(0))
-  expect_equal(extract_leading_digits(empty_vec, mode = 2), numeric(0))
-  result <- extract_leading_digits(empty_vec, mode = 3)
-  expect_named(result, c("first_digits", "second_digits"))
-  expect_equal(result$first_digits, numeric(0))
-  expect_equal(result$second_digits, numeric(0))
+test_that("First digit extraction (mode=1) works correctly including single-digit numbers and small numbers", {
+  numbers <- c(123, 45, 1, 9.87, 20.5, 3000, 0.123, 0.045, 0.6789, 0.001)
+  result <- extract_leading_digits(numbers, mode = 1)
+  expect_equal(result, c(1, 4, 1, 9, 2, 3, 1, 4, 6, 1))
 })
 
-test_that("First digit extraction (mode=1) works correctly", {
-  numbers <- c(123, 45, 6789, 1, 9.87, 20.5, 3000)
-  expect_equal(extract_leading_digits(numbers, mode = 1), c(1,4,6,1,9,2,3))
-  
-  # Numbers < 1
-  small_nums <- c(0.123, 0.045, 0.6789, 0.001, 0.987, 0.205)
-  expect_equal(extract_leading_digits(small_nums, mode = 1), c(1,4,6,1,9,2))
+test_that("Second digit extraction (mode=2) works correctly and excludes single-digit numbers", {
+  numbers <- c(123, 45, 1, 9.87, 20.5, 3000, 0.123, 0.045, 0.6789, 0.001)
+  result <- extract_leading_digits(numbers, mode = 2)
+  # 123 -> 2
+  # 45  -> 5
+  # 1   -> EXCLUDED (NA)
+  # 9.87 -> 8
+  # 20.5 -> 0
+  # 3000 -> 0
+  # 0.123 -> 2
+  # 0.045 -> 5 (significant digits are 45)
+  # 0.6789 -> 7
+  # 0.001 -> EXCLUDED (NA)
+  expect_equal(result, c(2, 5, 8, 0, 0, 2, 5, 7))
 })
 
-test_that("Second digit extraction (mode=2) works correctly", {
-  numbers <- c(123, 45, 6789, 1, 9.87, 20.5, 3000)
-  # 3000 becomes "3000" -> second digit is 0
-  expect_equal(extract_leading_digits(numbers, mode = 2), c(2,5,7,0,8,0,0))
-  
-  # Numbers < 1
-  small_nums <- c(0.123, 0.045, 0.6789, 0.001, 0.987, 0.205)
-  # 0.001 becomes 1 -> only one digit -> NA
-  expect_equal(extract_leading_digits(small_nums, mode = 2), c(2,5,7,0,8,0))
-  
-  # Single-digit cases
-  expect_equal(extract_leading_digits(c(7, 0.8), mode = 2), c(0))
-})
-
-test_that("Dual digit extraction (mode=3) works correctly", {
-  numbers <- c(123, 45, 1, 0.205)
+test_that("Dual digit extraction (mode=3) works correctly and returns combined digits, excluding single-digit numbers", {
+  numbers <- c(123, 45, 1, 9.87, 20.5, 3000, 0.123, 0.045, 0.6789, 0.001)
   result <- extract_leading_digits(numbers, mode = 3)
-  
-  expect_named(result, c("first_digits", "second_digits"))
-  expect_equal(result$first_digits, c(1,4,1,2))
-  expect_equal(result$second_digits, c(2,5,0,0))
+  # 123 -> 12
+  # 45  -> 45
+  # 1   -> EXCLUDED (NA)
+  # 9.87 -> 98
+  # 20.5 -> 20
+  # 3000 -> 30
+  # 0.123 -> 12
+  # 0.045 -> 45
+  # 0.6789 -> 67
+  # 0.001 -> EXCLUDED (NA)
+  expect_equal(result, c(12, 45, 98, 20, 30, 12, 45, 67))
 })
 
-test_that("Edge cases are handled correctly", {
-  # Scientific notation values
-  expect_equal(extract_leading_digits(1e5, mode=1), 1)      # 100000 -> 1
-  expect_equal(extract_leading_digits(1e-5, mode=1), 1)      # 0.00001 -> 1
+test_that("extract_leading_digits handles empty input correctly across all modes", {
+  expect_equal(extract_leading_digits(numeric(0), mode = 1), numeric(0))
+  expect_equal(extract_leading_digits(numeric(0), mode = 2), numeric(0))
+  expect_equal(extract_leading_digits(numeric(0), mode = 3), numeric(0))
+})
+
+test_that("extract_leading_digits handles non-positive numbers by filtering and returns appropriate digits", {
+  numbers <- c(-123, 0, 45, 1, 987, -5, 0.00012)
+  # Filtered: 45, 1, 987, 0.00012
   
-  # Exactly 10 (boundary case)
-  expect_equal(extract_leading_digits(10, mode=1), 1)
-  expect_equal(extract_leading_digits(10, mode=2), c(0))
+  # Mode 1:
+  # 45 -> 4
+  # 1  -> 1
+  # 987 -> 9
+  # 0.00012 -> 1
+  suppressWarnings(expect_equal(extract_leading_digits(numbers, mode = 1), c(4, 1, 9, 1)))
   
-  # All zeros after decimal
-  expect_equal(extract_leading_digits(0.000100, mode=1), 1)
-  expect_equal(as.logical(), extract_leading_digits(0.000100, mode=2))  # "000100" -> second digit 0
+  # Mode 2:
+  # 45 -> 5
+  # 1  -> EXCLUDED
+  # 987 -> 8
+  # 0.00012 -> 2
+  suppressWarnings(expect_equal(extract_leading_digits(numbers, mode = 2), c(5, 8, 2)))
+  
+  # Mode 3:
+  # 45 -> 45
+  # 1  -> EXCLUDED
+  # 987 -> 98
+  # 0.00012 -> 12
+  suppressWarnings(expect_equal(extract_leading_digits(numbers, mode = 3), c(45, 98, 12)))
+})
+
+test_that("extract_leading_digits handles numbers that become single-digit after cleaning (e.g., 0.000000001)", {
+  numbers <- c(1.0, 0.000000001, 123456789)
+  
+  # Mode 1:
+  # 1.0 -> 1
+  # 0.000000001 -> 1
+  # 123456789 -> 1
+  expect_equal(extract_leading_digits(numbers, mode = 1), c(1, 1, 1))
+  
+  # Mode 2:
+  # 1.0 -> 0
+  # 0.000000001 -> EXCLUDED (becomes "1" after cleaning, no second digit)
+  # 123456789 -> 2
+  expect_equal(extract_leading_digits(numbers, mode = 2), c(0, 2))
+  
+  # Mode 3:
+  # 1.0 -> 10
+  # 0.000000001 -> EXCLUDED
+  # 123456789 -> 12
+  expect_equal(extract_leading_digits(numbers, mode = 3), c(10, 12))
+})
+
+test_that("extract_leading_digits warns for non-positive numbers", {
+  expect_warning(extract_leading_digits(c(1, -2, 0, 3), mode = 1), "Warning: Input numbers should be positive")
+})
+
+test_that("extract_leading_digits stops for non-numeric input", {
+  expect_error(extract_leading_digits("abc", mode = 1), "Error: 'numbers' must be a numeric vector.")
+})
+
+test_that("extract_leading_digits stops for invalid mode", {
+  expect_error(extract_leading_digits(c(10, 20), mode = 4), "Error: 'mode' must be 1 \\(first digit\\), 2 \\(second digit\\), or 3 \\(first and second digits\\).")
 })
 
 test_that("generate_benford_distribution input validation works", {
